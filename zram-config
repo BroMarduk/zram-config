@@ -243,6 +243,18 @@ disableZephemeral() {
 serviceConfiguration() {
 	if [[ $1 == "stop" ]]; then
 		echo "Stopping services that interfere with zram device configuration" >> "$ZLOG"
+		if dpkg -s 'nginx' &> /dev/null && [[ $(systemctl is-active nginx.service) == "active" ]]; then
+			export nginxActive="true"
+			systemctl stop nginx.service >> "$ZLOG" 2>&1 || return 1
+		fi
+		if dpkg -s 'samba' &> /dev/null && [[ $(systemctl is-active smbd.service) == "active" ]]; then
+			export sambaActive="true"
+			systemctl stop smbd.service nmbd.service >> "$ZLOG" 2>&1 || return 1
+		fi
+		if dpkg -s 'openhab2' &> /dev/null && [[ $(systemctl is-active openhab2.service) == "active" ]]; then
+			export openhabActive="true"
+			systemctl stop openhab2.service >> "$ZLOG" 2>&1 || return 1
+		fi
 		if [[ $(systemctl is-active rsyslog.service) == "active" ]]; then
 			export rsyslogActive="true"
 			systemctl stop syslog.socket rsyslog.service >> "$ZLOG" 2>&1 || return 1
@@ -258,6 +270,15 @@ serviceConfiguration() {
 		fi
 		if [[ -n $rsyslogActive ]]; then
 			systemctl restart syslog.socket rsyslog.service >> "$ZLOG" 2>&1 || return 1
+		fi
+		if [[ -n $openhabActive ]]; then
+			systemctl restart openhab2.service >> "$ZLOG" 2>&1 || return 1
+		fi
+		if [[ -n $sambaActive ]]; then
+			systemctl restart smbd.service nmbd.service >> "$ZLOG" 2>&1 || return 1
+		fi
+		if [[ -n $nginxActive ]]; then
+			systemctl restart nginx.service >> "$ZLOG" 2>&1 || return 1
 		fi
 	fi
 }
@@ -324,6 +345,7 @@ case "$1" in
 							TARGET_DIR="$5"
 							BIND_DIR="$6"
 							if [[ $ZEPHEMERAL == "false" ]]; then
+								serviceConfiguration "stop"
 								createZdir
 							fi
 							;;
@@ -378,6 +400,7 @@ case "$1" in
 							TARGET_DIR="$3"
 							BIND_DIR="$4"
 							if [[ $ZEPHEMERAL == "false" ]]; then
+								serviceConfiguration "stop"
 								removeZdir
 							fi
 							;;
